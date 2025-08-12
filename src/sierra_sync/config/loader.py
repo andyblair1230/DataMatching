@@ -14,7 +14,8 @@ ENV_PREFIX = "SIERRA_"
 
 @dataclass(frozen=True)
 class Config:
-    data_root: Path
+    scid_root: Path
+    depth_root: Path
     logs_root: Path
     timezone: str
 
@@ -22,7 +23,8 @@ class Config:
 def _from_defaults() -> Config:
     d: Defaults = DEFAULTS
     return Config(
-        data_root=Path(d.data_root),
+        scid_root=Path(d.scid_root),
+        depth_root=Path(d.depth_root),
         logs_root=Path(d.logs_root),
         timezone=d.timezone,
     )
@@ -39,7 +41,8 @@ def _apply_env(cfg: Config) -> Config:
 
     return replace(
         cfg,
-        data_root=env_path("DATA_ROOT", cfg.data_root),
+        scid_root=env_path("SCID_ROOT", cfg.scid_root),
+        depth_root=env_path("DEPTH_ROOT", cfg.depth_root),
         logs_root=env_path("LOGS_ROOT", cfg.logs_root),
         timezone=env_str("TIMEZONE", cfg.timezone),
     )
@@ -53,11 +56,14 @@ def _apply_yaml(cfg: Config, path: Path | None) -> Config:
     with path.open("r", encoding="utf-8") as f:
         doc: dict[str, t.Any] = yaml.safe_load(f) or {}
 
-    data_root = Path(doc.get("data_root", cfg.data_root))
+    scid_root = Path(doc.get("scid_root", cfg.scid_root))
+    depth_root = Path(doc.get("depth_root", cfg.depth_root))
     logs_root = Path(doc.get("logs_root", cfg.logs_root))
     timezone = doc.get("timezone", cfg.timezone)
 
-    return replace(cfg, data_root=data_root, logs_root=logs_root, timezone=timezone)
+    return replace(
+        cfg, scid_root=scid_root, depth_root=depth_root, logs_root=logs_root, timezone=timezone
+    )
 
 
 def load_config(yaml_path: str | Path | None = None) -> Config:
@@ -71,7 +77,6 @@ def load_config(yaml_path: str | Path | None = None) -> Config:
     cfg = _apply_env(cfg)
     cfg = _apply_yaml(cfg, Path(yaml_path) if yaml_path else None)
 
-    # Minimal validation
     if not cfg.timezone:
         raise ValueError("timezone must be set")
     return cfg

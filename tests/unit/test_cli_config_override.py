@@ -8,7 +8,8 @@ def test_cli_with_yaml_override(tmp_path, capsys):
     yml.write_text(
         textwrap.dedent(
             """
-        data_root: C:\\yaml-data
+        scid_root: C:\\yaml-scid
+        depth_root: C:\\yaml-depth
         logs_root: C:\\yaml-logs
         timezone: America/Chicago
     """
@@ -19,19 +20,22 @@ def test_cli_with_yaml_override(tmp_path, capsys):
     rc = main(["doctor", "--config", str(yml)])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "C:\\yaml-data" in out
+    assert "C:\\yaml-scid" in out
+    assert "C:\\yaml-depth" in out
     assert "C:\\yaml-logs" in out
     assert "America/Chicago" in out
 
 
 def test_cli_with_env_override(monkeypatch, capsys):
-    monkeypatch.setenv("SIERRA_DATA_ROOT", r"C:\env-data")
+    monkeypatch.setenv("SIERRA_SCID_ROOT", r"C:\env-scid")
+    monkeypatch.setenv("SIERRA_DEPTH_ROOT", r"C:\env-depth")
     monkeypatch.setenv("SIERRA_LOGS_ROOT", r"C:\env-logs")
     monkeypatch.setenv("SIERRA_TIMEZONE", "UTC")
 
     rc = main(["doctor"])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "C:\\env-data" in out
+    assert "C:\\env-scid" in out
+    assert "C:\\env-depth" in out
     assert "C:\\env-logs" in out
     assert "UTC" in out

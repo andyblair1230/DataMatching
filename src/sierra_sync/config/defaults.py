@@ -4,13 +4,14 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class Defaults:
-    data_root: Path
-    logs_root: Path
-    timezone: str
+    # Where Sierra stores intraday SCID files
+    scid_root: Path = Path(r"C:\SierraChart\Data")
+    # Where Sierra stores market depth binaries
+    depth_root: Path = Path(r"C:\SierraChart\Data\MarketDepthData")
+    # Your project logs/artifacts
+    logs_root: Path = Path(r"C:\sierra-logs")
+    # Sierra runs in New York time by default
+    timezone: str = "America/New_York"
 
 
-DEFAULTS = Defaults(
-    data_root=Path(r"C:\data"),  # change to your actual default
-    logs_root=Path(r"C:\logs"),  # change to your actual default
-    timezone="UTC",
-)
+DEFAULTS = Defaults()

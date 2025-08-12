@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from . import __version__
 from .config.loader import load_config
+from .utils.logging import get_logger
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -35,10 +37,27 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "doctor":
         cfg = load_config(args.config)
+
+        # per-run log file under logs_root/YYYYMMDD/HHMMSS.log
+        run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
+        log = get_logger("sierra_sync.doctor", logs_root=cfg.logs_root, run_id=run_id)
+
         print("env ok")
-        print(f"config.data_root = {cfg.data_root}")
-        print(f"config.logs_root = {cfg.logs_root}")
-        print(f"config.timezone  = {cfg.timezone}")
+        print(f"config.scid_root  = {cfg.scid_root}")
+        print(f"config.depth_root = {cfg.depth_root}")
+        print(f"config.logs_root  = {cfg.logs_root}")
+        print(f"config.timezone   = {cfg.timezone}")
+
+        log.info(
+            "doctor_config",
+            extra={
+                "scid_root": str(cfg.scid_root),
+                "depth_root": str(cfg.depth_root),
+                "logs_root": str(cfg.logs_root),
+                "timezone": cfg.timezone,
+                "run_id": run_id,
+            },
+        )
         return 0
 
     parser.print_help()
