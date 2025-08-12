@@ -2,23 +2,21 @@ from __future__ import annotations
 
 import argparse
 import sys
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 from . import __version__
 from .config.loader import load_config
-from .pipeline.sync import SyncRequest, run_sync
 from .utils.logging import get_logger
+from .utils.market import build_contract_id, candidate_depth_filename, matching_scid_file
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="sierra-sync", description="Sierra trade/depth matcher")
     sub = p.add_subparsers(dest="cmd", required=False)
 
-    # version
     sub.add_parser("version", help="print version")
 
-    # doctor
     doctor = sub.add_parser("doctor", help="basic environment checks and config")
     doctor.add_argument(
         "--config",
@@ -27,14 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional path to a YAML settings file to load",
     )
 
-    # sync
-    sync = sub.add_parser("sync", help="match trade/depth for a symbol and day")
-    sync.add_argument("--symbol", required=True, help="Symbol root, e.g. ES, NQ, CL")
-    sync.add_argument(
-        "--date", required=True, type=lambda s: date.fromisoformat(s), help="YYYY-MM-DD"
-    )
-    sync.add_argument("--config", type=Path, default=None, help="Optional YAML settings file")
-    sync.add_argument("--dry-run", action="store_true", help="Plan only; do not write outputs")
+    sync = sub.add_parser("sync", help="find matching SCID and depth files for a given symbol/date")
+    sync.add_argument("symbol", help="Symbol root, e.g. ES or MES")
+    sync.add_argument("date", help="Trading date in YYYY-MM-DD format")
 
     return p
 
@@ -49,8 +42,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "doctor":
         cfg = load_config(args.config)
-
-        # per-run log file under logs_root/YYYYMMDD/HHMMSS.log
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         log = get_logger("sierra_sync.doctor", logs_root=cfg.logs_root, run_id=run_id)
 
@@ -73,12 +64,22 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "sync":
-        cfg = load_config(args.config)
-        run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
-        req = SyncRequest(
-            symbol=args.symbol, day=args.date, dry_run=bool(args.dry_run), run_id=run_id
-        )
-        return run_sync(cfg, req)
+        cfg = load_config(None)
+        try:
+            day = datetime.strptime(args.date, "%Y-%m-%d").date()
+        except ValueError:
+            print(f"Invalid date format: {args.date}. Use YYYY-MM-DD.")
+            return 1
+
+        contract = build_contract_id(cfg.scid_root, args.symbol, day)
+        scid_path = matching_scid_file(cfg.scid_root, contract)
+        depth_path = candidate_depth_filename(cfg.depth_root, contract, day)
+
+        print(f"Contract ID: {contract.stem()}")
+        print(f"SCID file:   {scid_path if scid_path else 'Not found'}")
+        print(f"Depth file:  {depth_path if depth_path.exists() else 'Not found'}")
+
+        return 0
 
     parser.print_help()
     return 0
