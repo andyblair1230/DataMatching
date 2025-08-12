@@ -7,18 +7,16 @@ repos:
         args: [--quiet]
         language: system
         types: [python]
-
       - id: ruff
         name: ruff
         entry: ruff
         args: [check, --fix]
         language: system
         types: [python]
-
       - id: mypy
         name: mypy
         entry: mypy
-        # limit mypy to your package to keep it fast at first
-        args: [src]
+        args: [-p, sierra_sync]
         language: system
         types: [python]
+        pass_filenames: false

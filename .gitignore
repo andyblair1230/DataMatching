@@ -1,0 +1,23 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# builds
+dist/
+build/
+*.egg-info/
+
+# editor
+.vscode/
+.idea/
+
+# os
+Thumbs.db
+.DS_Store
+
+# project data
+data/
+logs/
+artifacts/
