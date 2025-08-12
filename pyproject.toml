@@ -19,7 +19,8 @@ target-version = ["py312"]
 line-length = 100
 target-version = "py312"
 fix = true
-# Enable a sane default ruleset, and we can tune later
+
+[tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 ignore = []
 
