@@ -6,25 +6,24 @@ from pathlib import Path
 
 
 @dataclass(frozen=True)
-class DiscoveredPaths:
+class DiscoveredCandidate:
     stem: str
     scid_file: Path | None
-    depth_file: Path | None
+    depth_file: Path
+    depth_mtime: float  # for tie-breaking
 
 
 def _depth_for_day(depth_root: Path, symbol: str, day: date) -> list[Path]:
-    """Return all depth files for a symbol on a specific day."""
     depth_root = Path(depth_root)
     return [p for p in depth_root.glob(f"{symbol}*.{day.isoformat()}.depth") if p.is_file()]
 
 
 def _extract_stem(depth_file: Path, day: date) -> str:
-    """From '<STEM>.<YYYY-MM-DD>.depth' recover STEM exactly."""
     suffix = f".{day.isoformat()}.depth"
     name = depth_file.name
     if not name.endswith(suffix):
         raise ValueError(f"Depth filename not in expected form: {name}")
-    return name[: -len(suffix)]  # everything before '.YYYY-MM-DD.depth'
+    return name[: -len(suffix)]
 
 
 def _matching_scid(scid_root: Path, stem: str) -> Path | None:
@@ -32,38 +31,59 @@ def _matching_scid(scid_root: Path, stem: str) -> Path | None:
     return p if p.exists() else None
 
 
-def discover_by_depth(
+def discover_by_depth_multi(
     scid_root: Path,
     depth_root: Path,
     symbol: str,
     day: date,
     search_window_days: int = 0,
-) -> DiscoveredPaths | None:
+) -> list[DiscoveredCandidate]:
     """
-    Preferred discovery:
-      - Look for depth file(s) on 'day' for 'symbol'.
-      - If multiple, pick the newest by mtime.
-      - Extract <stem> from filename and find '<stem>.scid'.
+    Return ALL matching (stem, scid, depth) candidates for the given symbol/day.
+    If none on 'day' and search_window_days > 0, scan +/- N days until any appear.
+    """
+    scid_root = Path(scid_root)
+    depth_root = Path(depth_root)
 
-    If none on 'day' and search_window_days > 0, search +/- N days and
-    pick the nearest day with depth; otherwise return None.
-    """
-    candidates = _depth_for_day(depth_root, symbol, day)
+    candidates: list[Path] = _depth_for_day(depth_root, symbol, day)
     if not candidates and search_window_days > 0:
+        found_day: date | None = None
         for delta in range(1, search_window_days + 1):
             for d in (day - timedelta(days=delta), day + timedelta(days=delta)):
                 more = _depth_for_day(depth_root, symbol, d)
                 if more:
                     candidates = more
-                    day = d
+                    found_day = d
                     break
             if candidates:
                 break
+        if found_day:
+            day = found_day  # use the day we actually found files on
 
-    if not candidates:
+    results: list[DiscoveredCandidate] = []
+    for depth in candidates:
+        stem = _extract_stem(depth, day)
+        scid = _matching_scid(scid_root, stem)
+        results.append(
+            DiscoveredCandidate(
+                stem=stem,
+                scid_file=scid,
+                depth_file=depth,
+                depth_mtime=depth.stat().st_mtime,
+            )
+        )
+    return results
+
+
+def choose_best(cands: list[DiscoveredCandidate]) -> DiscoveredCandidate | None:
+    """
+    Heuristic:
+      1) Prefer candidates where SCID exists.
+      2) Among those, newest depth mtime wins.
+      3) If none have SCID, just take newest depth mtime.
+    """
+    if not cands:
         return None
-
-    depth = max(candidates, key=lambda p: p.stat().st_mtime)
-    stem = _extract_stem(depth, day)
-    scid = _matching_scid(scid_root, stem)
-    return DiscoveredPaths(stem=stem, scid_file=scid, depth_file=depth)
+    with_scid = [c for c in cands if c.scid_file is not None]
+    pool = with_scid if with_scid else cands
+    return max(pool, key=lambda c: c.depth_mtime)

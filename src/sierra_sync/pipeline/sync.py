@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 
 from ..config.loader import Config
-from ..io_adapters.discovery import discover_by_depth
+from ..io_adapters.discovery import choose_best, discover_by_depth_multi
 from ..utils.logging import get_logger
 
 
@@ -15,20 +15,13 @@ class SyncRequest:
     day: date
     dry_run: bool = True
     run_id: str | None = None
+    prefer_stem: str | None = None  # allow explicit pick
 
 
 def run_sync(cfg: Config, req: SyncRequest) -> int:
-    """
-    Validate roots, locate SCID/depth by inspecting depth filenames for the date.
-    Return codes:
-      0 = ok (dry-run or actual run)
-      2 = config/root error
-      3 = scid not found for detected stem
-      4 = depth not found (even after fallback window)
-    """
     log = get_logger("sierra_sync.sync", logs_root=cfg.logs_root, run_id=req.run_id)
 
-    # Validate roots exist
+    # Validate roots
     missing = []
     if not Path(cfg.scid_root).exists():
         missing.append(("scid_root", str(cfg.scid_root)))
@@ -39,60 +32,80 @@ def run_sync(cfg: Config, req: SyncRequest) -> int:
             log.error("missing_root", extra={"root": k, "path": p})
         return 2
 
-    # Discover by depth filename (authoritative). Search +/- 7 days if needed.
-    found = discover_by_depth(
+    # Discover all candidates for that day (or nearby)
+    cands = discover_by_depth_multi(
         Path(cfg.scid_root), Path(cfg.depth_root), req.symbol, req.day, search_window_days=7
     )
-    if not found:
+    if not cands:
         log.error("depth_missing_for_day", extra={"symbol": req.symbol, "day": req.day.isoformat()})
+        if req.dry_run:
+            print(f"No depth files found for {req.symbol} on/near {req.day.isoformat()}")
         return 4
 
-    scid_str = str(found.scid_file) if found.scid_file else None
-    depth_str = str(found.depth_file) if found.depth_file else None
+    # Pick specific stem if requested
+    chosen = None
+    if req.prefer_stem:
+        for c in cands:
+            if c.stem.lower() == req.prefer_stem.lower():
+                chosen = c
+                break
+        if not chosen:
+            log.error("preferred_stem_not_found", extra={"prefer_stem": req.prefer_stem})
+            if req.dry_run:
+                print(f"Requested stem {req.prefer_stem} not found among candidates.")
+            return 4
+    else:
+        chosen = choose_best(cands)
 
+    # Log plan
     log.info(
-        "sync_plan",
+        "sync_plan_multi",
         extra={
             "symbol": req.symbol,
             "day": req.day.isoformat(),
-            "stem": found.stem,
-            "scid_path": scid_str,
-            "depth_path": depth_str,
-            "depth_exists": bool(found.depth_file and Path(found.depth_file).exists()),
+            "candidates": [
+                {
+                    "stem": c.stem,
+                    "scid_path": str(c.scid_file) if c.scid_file else None,
+                    "depth_path": str(c.depth_file),
+                    "depth_exists": Path(c.depth_file).exists(),
+                    "depth_mtime": c.depth_mtime,
+                }
+                for c in cands
+            ],
+            "chosen": {
+                "stem": chosen.stem if chosen else None,
+                "scid_path": str(chosen.scid_file) if (chosen and chosen.scid_file) else None,
+                "depth_path": str(chosen.depth_file) if chosen else None,
+            },
             "dry_run": req.dry_run,
         },
     )
 
-    if found.scid_file is None:
-        log.error("scid_missing", extra={"expected": f"{found.stem}.scid"})
-        # In dry-run, also show the expected path for clarity
-        if req.dry_run:
-            print("SCID file:   Not found (expected:", f"{found.stem}.scid", ")")
-            if depth_str:
-                print(
-                    "Depth file:  ",
-                    depth_str,
-                    "(exists)" if Path(depth_str).exists() else "(missing)",
-                )
-        return 3
-
-    if not (found.depth_file and Path(found.depth_file).exists()):
-        log.error("depth_missing", extra={"expected": f"{found.stem}.{req.day.isoformat()}.depth"})
-        if req.dry_run:
-            print(f"Contract ID: {found.stem}")
-            print(f"SCID file:   {scid_str}")
-            if depth_str:
-                print("Depth file:  ", depth_str, "(missing)")
-        return 4
-
-    # Dry-run: print the resolution so the user sees exactly what would be used
+    # Dry-run: print a friendly summary
     if req.dry_run:
-        print(f"Contract ID: {found.stem}")
-        print(f"SCID file:   {scid_str}")
-        print(f"Depth file:  {depth_str} (exists)")
-        log.info("sync_dry_run_done", extra={"stem": found.stem})
+        print("Candidates:")
+        for c in sorted(cands, key=lambda x: x.depth_mtime, reverse=True):
+            sc = str(c.scid_file) if c.scid_file else "SCID: MISSING"
+            ex = "(exists)" if Path(c.depth_file).exists() else "(missing)"
+            print(f"  - {c.stem} | {c.depth_file.name} {ex} | {sc}")
+        if chosen:
+            print("\nChosen:")
+            print(f"  Contract ID: {chosen.stem}")
+            print(f"  SCID file:   {chosen.scid_file if chosen.scid_file else 'Not found'}")
+            print(f"  Depth file:  {chosen.depth_file} (exists)")
         return 0
 
-    # TODO: real ingestion/matching/export goes here for non-dry-run mode.
-    log.info("sync_done", extra={"stem": found.stem})
+    # Non-dry-run checks
+    if chosen is None:
+        return 4
+    if chosen.scid_file is None:
+        log.error("scid_missing", extra={"expected": f"{chosen.stem}.scid"})
+        return 3
+    if not Path(chosen.depth_file).exists():
+        log.error("depth_missing", extra={"expected": chosen.depth_file.name})
+        return 4
+
+    # TODO: call the actual ingestion/matching/export here.
+    log.info("sync_done", extra={"stem": chosen.stem})
     return 0

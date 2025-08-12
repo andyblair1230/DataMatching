@@ -33,6 +33,9 @@ def build_parser() -> argparse.ArgumentParser:
     sync.add_argument("date", type=lambda s: date.fromisoformat(s), help="YYYY-MM-DD")
     sync.add_argument("--config", type=Path, default=None, help="Optional YAML settings file")
     sync.add_argument("--dry-run", action="store_true", help="Plan only; do not write outputs")
+    sync.add_argument(
+        "--stem", type=str, default=None, help="Force contract stem, e.g. ESU25_FUT_CME"
+    )
 
     return p
 
@@ -74,7 +77,11 @@ def main(argv: list[str] | None = None) -> int:
         cfg = load_config(args.config)
         run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
         req = SyncRequest(
-            symbol=args.symbol, day=args.date, dry_run=bool(args.dry_run), run_id=run_id
+            symbol=args.symbol,
+            day=args.date,
+            dry_run=bool(args.dry_run),
+            run_id=run_id,
+            prefer_stem=args.stem,
         )
         return run_sync(cfg, req)
 
