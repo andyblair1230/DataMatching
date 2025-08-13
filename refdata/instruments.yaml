@@ -1,0 +1,29 @@
+version: 1
+
+# Month letter codes per CME; many symbols only list a subset in allowed_contract_months
+month_code:
+  1: F
+  2: G
+  3: H
+  4: J
+  5: K
+  6: M
+  7: N
+  8: Q
+  9: U
+  10: V
+  11: X
+  12: Z
+
+instruments:
+  ES:
+    description: E-mini S&P 500 Futures
+    exchange: CME
+    # ES lists quarterly contracts
+    allowed_contract_months: [H, M, U, Z]  # Mar, Jun, Sep, Dec
+    # File stem templates used in Sierra Chart for your data set
+    stem_template: "{SYMBOL}{MONTH}{YY}_FUT_CME"
+    # Depth files roll daily at 00:00 UTC; Saturdays may have batches
+    depth_roll_utc: "00:00:00"
+    # Placeholder for explicit expiration/trading end per contract (fill later from CME docs)
+    expiration_dates: []  # items like { y: 2025, m: 9, last_trade_utc: "2025-09-19T21:00:00Z" }

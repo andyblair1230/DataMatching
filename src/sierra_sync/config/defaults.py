@@ -1,17 +1,15 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
-from pathlib import Path
 
 
 @dataclass(frozen=True)
 class Defaults:
-    # Where Sierra stores intraday SCID files
-    scid_root: Path = Path(r"C:\SierraChart\Data")
-    # Where Sierra stores market depth binaries
-    depth_root: Path = Path(r"C:\SierraChart\Data\MarketDepthData")
-    # Your project logs/artifacts
-    logs_root: Path = Path(r"C:\sierra-logs")
-    # Sierra runs in New York time by default
+    scid_root: str = r"C:\SierraChart\Data"
+    depth_root: str = r"C:\SierraChart\Data\MarketDepthData"
+    logs_root: str = r"C:\sierra-logs"
     timezone: str = "America/New_York"
+    refdata_file: str = r"C:\dev\DataMatching\refdata\instruments.yaml"  # NEW
 
 
 DEFAULTS = Defaults()
