@@ -56,10 +56,14 @@ def main(argv: list[str] | None = None) -> int:
         log = get_logger("sierra_sync.doctor", logs_root=cfg.logs_root, run_id=run_id)
 
         print("env ok")
-        print(f"config.scid_root  = {cfg.scid_root}")
-        print(f"config.depth_root = {cfg.depth_root}")
-        print(f"config.logs_root  = {cfg.logs_root}")
-        print(f"config.timezone   = {cfg.timezone}")
+        print(f"config.scid_root      = {cfg.scid_root}")
+        print(f"config.depth_root     = {cfg.depth_root}")
+        print(f"config.logs_root      = {cfg.logs_root}")
+        print(f"config.timezone       = {cfg.timezone}")
+        if getattr(cfg, "refdata_file", None):
+            print(f"config.refdata_file   = {cfg.refdata_file}")
+        if getattr(cfg, "cme_specs_root", None):
+            print(f"config.cme_specs_root = {cfg.cme_specs_root}")
 
         log.info(
             "doctor_config",
@@ -68,6 +72,12 @@ def main(argv: list[str] | None = None) -> int:
                 "depth_root": str(cfg.depth_root),
                 "logs_root": str(cfg.logs_root),
                 "timezone": cfg.timezone,
+                "refdata_file": (
+                    str(cfg.refdata_file) if getattr(cfg, "refdata_file", None) else None
+                ),
+                "cme_specs_root": (
+                    str(cfg.cme_specs_root) if getattr(cfg, "cme_specs_root", None) else None
+                ),
                 "run_id": run_id,
             },
         )

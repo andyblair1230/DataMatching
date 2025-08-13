@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import os
-import typing as t
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
-from .defaults import DEFAULTS, Defaults
-
-ENV_PREFIX = "SIERRA_"
+from .defaults import DEFAULTS
 
 
 @dataclass(frozen=True)
@@ -18,65 +16,73 @@ class Config:
     depth_root: Path
     logs_root: Path
     timezone: str
+    refdata_file: Path | None
+    cme_specs_root: Path | None
 
 
-def _from_defaults() -> Config:
-    d: Defaults = DEFAULTS
+def _req_path(base: dict[str, Any], key: str, default: str) -> Path:
+    """Return a required Path, falling back to default if missing/empty."""
+    val = base.get(key) or default
+    return Path(val)
+
+
+def _opt_path(base: dict[str, Any], key: str) -> Path | None:
+    """Return an optional Path, or None if missing/empty."""
+    val = base.get(key)
+    return Path(val) if val else None
+
+
+def _apply_yaml_overrides(base: dict[str, Any], yml: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    for k in ("scid_root", "depth_root", "logs_root", "timezone", "refdata_file", "cme_specs_root"):
+        if k in yml:
+            out[k] = yml[k]
+    return out
+
+
+def _apply_env_overrides(base: dict[str, Any]) -> dict[str, Any]:
+    out = dict(base)
+    if v := os.getenv("SIERRA_SCID_ROOT"):
+        out["scid_root"] = v
+    if v := os.getenv("SIERRA_DEPTH_ROOT"):
+        out["depth_root"] = v
+    if v := os.getenv("SIERRA_LOGS_ROOT"):
+        out["logs_root"] = v
+    if v := os.getenv("SIERRA_TIMEZONE"):
+        out["timezone"] = v
+    if v := os.getenv("SIERRA_REFDATA_FILE"):
+        out["refdata_file"] = v
+    if v := os.getenv("SIERRA_CME_SPECS_ROOT"):
+        out["cme_specs_root"] = v
+    return out
+
+
+def load_config(yaml_path: Path | None = None) -> Config:
+    # start from defaults as a dict
+    base = {
+        "scid_root": DEFAULTS.scid_root,
+        "depth_root": DEFAULTS.depth_root,
+        "logs_root": DEFAULTS.logs_root,
+        "timezone": DEFAULTS.timezone,
+        "refdata_file": DEFAULTS.refdata_file,
+        "cme_specs_root": DEFAULTS.cme_specs_root,
+    }
+
+    # ENV overrides (middle precedence)
+    base = _apply_env_overrides(base)
+
+    # YAML overrides (highest precedence)
+    if yaml_path:
+        data = yaml.safe_load(Path(yaml_path).read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("Config YAML must be a mapping at the top level.")
+        base = _apply_yaml_overrides(base, data)
+
     return Config(
-        scid_root=Path(d.scid_root),
-        depth_root=Path(d.depth_root),
-        logs_root=Path(d.logs_root),
-        timezone=d.timezone,
+        scid_root=_req_path(base, "scid_root", DEFAULTS.scid_root),
+        depth_root=_req_path(base, "depth_root", DEFAULTS.depth_root),
+        logs_root=_req_path(base, "logs_root", DEFAULTS.logs_root),
+        timezone=str(base["timezone"]),
+        refdata_file=_opt_path(base, "refdata_file"),
+        cme_specs_root=_opt_path(base, "cme_specs_root"),
     )
-
-
-def _apply_env(cfg: Config) -> Config:
-    def env_path(key: str, cur: Path) -> Path:
-        v = os.environ.get(f"{ENV_PREFIX}{key}")
-        return Path(v) if v else cur
-
-    def env_str(key: str, cur: str) -> str:
-        v = os.environ.get(f"{ENV_PREFIX}{key}")
-        return v if v else cur
-
-    return replace(
-        cfg,
-        scid_root=env_path("SCID_ROOT", cfg.scid_root),
-        depth_root=env_path("DEPTH_ROOT", cfg.depth_root),
-        logs_root=env_path("LOGS_ROOT", cfg.logs_root),
-        timezone=env_str("TIMEZONE", cfg.timezone),
-    )
-
-
-def _apply_yaml(cfg: Config, path: Path | None) -> Config:
-    if not path:
-        return cfg
-    if not path.exists():
-        raise FileNotFoundError(f"Config file not found: {path}")
-    with path.open("r", encoding="utf-8") as f:
-        doc: dict[str, t.Any] = yaml.safe_load(f) or {}
-
-    scid_root = Path(doc.get("scid_root", cfg.scid_root))
-    depth_root = Path(doc.get("depth_root", cfg.depth_root))
-    logs_root = Path(doc.get("logs_root", cfg.logs_root))
-    timezone = doc.get("timezone", cfg.timezone)
-
-    return replace(
-        cfg, scid_root=scid_root, depth_root=depth_root, logs_root=logs_root, timezone=timezone
-    )
-
-
-def load_config(yaml_path: str | Path | None = None) -> Config:
-    """
-    Load configuration with this precedence:
-    1) Defaults (code)
-    2) Environment variables (prefixed SIERRA_)
-    3) YAML file (explicit path)
-    """
-    cfg = _from_defaults()
-    cfg = _apply_env(cfg)
-    cfg = _apply_yaml(cfg, Path(yaml_path) if yaml_path else None)
-
-    if not cfg.timezone:
-        raise ValueError("timezone must be set")
-    return cfg
