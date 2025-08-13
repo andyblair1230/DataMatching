@@ -1,47 +1,77 @@
-Sierra Market Data Stream Matching Script
+# sierra-sync
 
+Deterministic trade and depth file matcher for [Sierra Chart](https://www.sierrachart.com/).
 
+`sierra-sync` locates and pairs `.scid` trade files with their corresponding market depth (`.depth`) files for a given symbol and trading day. It’s designed to be deterministic and easy to integrate into further processing pipelines.
 
--Purpose:
+## Installation
 
-Build a deterministic pipeline that ingests Sierra Chart trade and depth binaries, aligns their event sequences for historical and live data, and writes matched outputs back in Sierra-compatible formats.
+Clone the repo:
 
+git clone https://github.com/andyblair1230/DataMatching.git
+cd DataMatching
 
--Inputs:
+Install in development (editable) mode:
 
-SCID intraday files and daily depth binaries. Live mode tails the same files while they grow.
+pip install -e .
 
+Or build and install normally:
 
--Outputs:
+pip install .
 
-Matched records written to SCID and depth files for Sierra to read. Optional live mirror via DTC client later.
+Requires Python 3.12+.
 
+## Configuration
 
--Hard requirements:
+`sierra-sync` loads settings from a YAML file.  
+The config can be specified with `--config` or defaults to your `config.yaml` in the repo root.
 
-Deterministic results for identical inputs. Idempotent re-runs. Internal time unit is integer nanoseconds since Unix epoch. One trade is matched at most once. Side, volume deltas, and record order are preserved. Same inputs produce the same outputs regardless of chunking.
+Example `config.yaml`:
 
+scid_root: C:\SierraChart\Data
+depth_root: C:\SierraChart\Data\MarketDepthData
+logs_root: C:\sierra-logs
+timezone: America/New_York
 
--Non-goals:
+- scid_root: Directory containing `.scid` trade files  
+- depth_root: Directory containing `.depth` market depth files  
+- logs_root: Directory for `sierra-sync` logs  
+- timezone: Your Sierra Chart timezone (IANA format)  
 
-No analytics, indicators, or ML features. No charting. No broker integration beyond Sierra file formats or DTC mirror.
+## Commands
 
+### Version
+python -m sierra_sync version  
+Outputs the installed version.
 
--Success criteria:
+### Doctor
+python -m sierra_sync doctor  
+Runs basic environment and config checks, logging to `logs_root`.
 
-On a fixed set of symbols and days, total volume and order count per timestamp reconcile exactly between trades and depth deltas. Zero unmatched trades except explicitly logged anomalies. End-to-end processing for one full RTH session completes within a target wall time you will set after profiling.
+### Sync
+python -m sierra_sync sync ES 2025-08-12  
+Attempts to locate the matching `.scid` and `.depth` files for `ES` on August 12, 2025.
 
+#### Dry Run
+python -m sierra_sync sync ES 2025-08-12 --dry-run  
+Prints the plan without performing any writes.
 
--Constraints:
+#### Selecting a specific stem
+python -m sierra_sync sync ES 2025-08-12 --dry-run --stem ESU25_FUT_CME  
+Restricts matching to the provided stem.
 
-Windows 10 environment. Python 3.12. Data stored outside the repo. Paths and parameters come from config, never hardcoded.
+## Logging
 
+Logs are written to:
+<logs_root>/<YYYYMMDD>/<HHMMSS>.log
 
--Verification:
+## Development
 
-A verifier re-reads written SCID and depth, checks header integrity, record count, timestamp monotonicity, and checksum of segment manifests.
+Lint, format, and type-check:
+pre-commit run --all-files
 
+Run tests:
+pytest
 
--Risks to watch:
-
-File sharing semantics on Windows. Clock conversions between Sierra time and epoch. Depth anomalies that resemble cancels. Memory spikes on large candidate windows.
+## License
+Proprietary. All rights reserved.
