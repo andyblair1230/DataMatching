@@ -49,9 +49,7 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(payload, ensure_ascii=False)
 
 
-def get_logger(
-    name: str, logs_root: Path, run_id: str | None = None, console_level: int = logging.INFO
-) -> logging.Logger:
+def get_logger(name: str, logs_root: Path, run_id: str | None = None, console_level: int = logging.INFO) -> logging.Logger:
     """
     Create/get a logger that writes JSON lines to logs_root/YYYYMMDD/run_id.log
     and human-readable INFO to console.

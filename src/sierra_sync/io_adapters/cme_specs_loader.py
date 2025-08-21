@@ -263,9 +263,7 @@ def tick_size(specs: CmeSpecs, product_code: str, exchange: str | None = None) -
     return None
 
 
-def dollars_per_tick(
-    specs: CmeSpecs, product_code: str, exchange: str | None = None
-) -> float | None:
+def dollars_per_tick(specs: CmeSpecs, product_code: str, exchange: str | None = None) -> float | None:
     """
     $/tick = (MinPxIncr / PriceDisplayFactor) * Mult
     """

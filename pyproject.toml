@@ -12,11 +12,11 @@ authors = [{ name = "Andy", email = "jablair1230@gmail.com" }]
 license = { text = "Proprietary" }
 
 [tool.black]
-line-length = 100
+line-length = 160
 target-version = ["py312"]
 
 [tool.ruff]
-line-length = 100
+line-length = 160
 target-version = "py312"
 fix = true
 

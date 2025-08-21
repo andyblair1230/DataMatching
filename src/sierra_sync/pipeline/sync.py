@@ -74,13 +74,7 @@ def _progress_line(
 
     pct = 1.0 if total <= 0 else min(max(done / total, 0.0), 1.0)
     fills = int(round(pct * bar_width))
-    bar = (
-        "["
-        + "=" * max(fills - 1, 0)
-        + (">" if 0 < pct < 1 else "=" if pct == 1 else "")
-        + "." * (bar_width - fills)
-        + "]"
-    )
+    bar = "[" + "=" * max(fills - 1, 0) + (">" if 0 < pct < 1 else "=" if pct == 1 else "") + "." * (bar_width - fills) + "]"
 
     rate = done / elapsed
     if unit == "bytes":
@@ -128,9 +122,7 @@ def run_sync(cfg: Config, req: SyncRequest) -> int:
         return 2
 
     # Discover all candidates for that day (or nearby)
-    cands = discover_by_depth_multi(
-        Path(cfg.scid_root), Path(cfg.depth_root), req.symbol, req.day, search_window_days=7
-    )
+    cands = discover_by_depth_multi(Path(cfg.scid_root), Path(cfg.depth_root), req.symbol, req.day, search_window_days=7)
     if not cands:
         log.error(
             "depth_missing_for_day",
@@ -240,14 +232,10 @@ def run_sync(cfg: Config, req: SyncRequest) -> int:
                 if req.progress:
                     now = time.perf_counter()
                     if now - last_tick >= 0.05:
-                        _print_progress(
-                            "Depth export", depth_rows, total, depth_start, unit="rec", final=False
-                        )
+                        _print_progress("Depth export", depth_rows, total, depth_start, unit="rec", final=False)
                         last_tick = now
             if req.progress:
-                _print_progress(
-                    "Depth export", depth_rows, total, depth_start, unit="rec", final=True
-                )
+                _print_progress("Depth export", depth_rows, total, depth_start, unit="rec", final=True)
         log.info("export_depth_done", extra={"out": str(depth_out)})
 
         # 2) SCID passthrough: slice to [00:00, 24:00) UTC of req.day
@@ -294,9 +282,7 @@ def run_sync(cfg: Config, req: SyncRequest) -> int:
                             )
                             last_tick = now
             if req.progress:
-                _print_progress(
-                    "SCID export", scid_rows, total_in_window, scid_start, unit="rec", final=True
-                )
+                _print_progress("SCID export", scid_rows, total_in_window, scid_start, unit="rec", final=True)
         log.info("export_scid_done", extra={"out": str(scid_out), "rows": scid_rows})
 
         # Summary
@@ -312,10 +298,7 @@ def run_sync(cfg: Config, req: SyncRequest) -> int:
         print("Export complete:")
         print(f"  Depth  -> {depth_out} (rows: {depth_rows:,}, size: {_fmt_bytes(depth_size)})")
         print(f"  SCID   -> {scid_out} (rows: {scid_rows:,}, size: {_fmt_bytes(scid_size)})")
-        print(
-            f"  Total  -> {_fmt_bytes(total_bytes)} in {overall_elapsed:0.2f}s"
-            f"  |  ~{mb_per_s:0.2f} MB/s  |  ~{recs_per_s:,.0f} rec/s"
-        )
+        print(f"  Total  -> {_fmt_bytes(total_bytes)} in {overall_elapsed:0.2f}s" f"  |  ~{mb_per_s:0.2f} MB/s  |  ~{recs_per_s:,.0f} rec/s")
         return 0
 
     # Placeholder for future matcher
